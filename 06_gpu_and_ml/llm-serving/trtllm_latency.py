@@ -331,8 +331,9 @@ app = modal.App("trtllm-latency")
 
 MINUTES = 60  # seconds
 
+
 def get_setup_args(mode):
-    import tensorrt_llm 
+    import tensorrt_llm
     import torch
 
     gpu_name = torch.cuda.get_device_name(0).replace(" ", "-").lower()
@@ -354,6 +355,7 @@ def get_setup_args(mode):
 
     return engine_path, engine_kwargs
 
+
 @app.function(
     image=tensorrt_image,
     gpu=GPU_CONFIG,
@@ -363,7 +365,7 @@ def get_setup_args(mode):
 def build_engine(mode):
     from huggingface_hub import snapshot_download
     from transformers import AutoTokenizer
-    import tensorrt_llm 
+    import tensorrt_llm
 
     model_path = MODELS_PATH / MODEL_ID
     engine_path, engine_kwargs = get_setup_args(mode)
@@ -381,6 +383,7 @@ def build_engine(mode):
     print(f"building new engine at {engine_path}")
     llm = LLM(model=model_path, **engine_kwargs)
     llm.save(engine_path)
+
 
 @app.cls(
     image=tensorrt_image,
@@ -404,7 +407,7 @@ class Model:
         from transformers import AutoTokenizer
 
         engine_path, engine_kwargs = get_setup_args(self.mode)
-        assert (os.path.exists(engine_path)), "build engine before calling"
+        assert os.path.exists(engine_path), "build engine before calling"
 
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
         self.sampling_params = SamplingParams(
@@ -556,10 +559,10 @@ def main(mode: str = "fast"):
 
 if __name__ == "__main__":
     import sys
+
     mode = sys.argv[1] if len(sys.argv) > 1 else "fast"
 
     try:
-
         print("🏎️  setting up model & trtllm engine")
         modal.Function.from_name("trtllm-latency", "build_engine").remote(mode)
 
