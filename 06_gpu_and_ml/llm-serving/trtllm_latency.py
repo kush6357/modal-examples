@@ -119,8 +119,10 @@ volume = modal.Volume.from_name(
 VOLUME_PATH = Path("/vol")
 MODELS_PATH = VOLUME_PATH / "models"
 
-MODEL_ID = "NousResearch/Meta-Llama-3-8B-Instruct"  # fork without repo gating
-MODEL_REVISION = "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+# MODEL_ID = "NousResearch/Meta-Llama-3-8B-Instruct"  # fork without repo gating
+# MODEL_ID = "Qwen/Qwen2.5-Coder-0.5B"  # fork without repo gating
+MODEL_ID = "Qwen/Qwen2.5-Coder-32B"  # fork without repo gating
+# MODEL_REVISION = "53346005fb0ef11d3b6a83b12c895cca40156b6c"
 
 tensorrt_image = tensorrt_image.pip_install(
     "hf-transfer==0.1.9",
@@ -329,6 +331,56 @@ app = modal.App("trtllm-latency")
 
 MINUTES = 60  # seconds
 
+def get_setup_args(mode):
+    import tensorrt_llm 
+    import torch
+
+    gpu_name = torch.cuda.get_device_name(0).replace(" ", "-").lower()
+    model_path = MODELS_PATH / MODEL_ID
+    engine_path = model_path / tensorrt_llm.__version__ / gpu_name / mode
+
+    if mode == "fast":
+        engine_kwargs = {
+            "quant_config": get_quant_config(),
+            "calib_config": get_calib_config(),
+            "build_config": get_build_config(),
+            "speculative_config": get_speculative_config(),
+            "tensor_parallel_size": torch.cuda.device_count(),
+        }
+    else:
+        engine_kwargs = {
+            "tensor_parallel_size": torch.cuda.device_count(),
+        }
+
+    return engine_path, engine_kwargs
+
+@app.function(
+    image=tensorrt_image,
+    gpu=GPU_CONFIG,
+    timeout=60 * MINUTES,
+    volumes={VOLUME_PATH: volume},
+)
+def build_engine(mode):
+    from huggingface_hub import snapshot_download
+    from transformers import AutoTokenizer
+    import tensorrt_llm 
+
+    model_path = MODELS_PATH / MODEL_ID
+    engine_path, engine_kwargs = get_setup_args(mode)
+    if os.path.exists(engine_path):
+        return engine_path
+
+    print("downloading base model if necessary")
+    snapshot_download(
+        MODEL_ID,
+        local_dir=model_path,
+        ignore_patterns=["*.pt", "*.bin"],  # using safetensors
+        # revision=MODEL_REVISION, # FIXME
+    )
+
+    print(f"building new engine at {engine_path}")
+    llm = LLM(model=model_path, **engine_kwargs)
+    llm.save(engine_path)
 
 @app.cls(
     image=tensorrt_image,
@@ -351,30 +403,10 @@ class Model:
         from huggingface_hub import snapshot_download
         from transformers import AutoTokenizer
 
-        self.model_path = MODELS_PATH / MODEL_ID
+        engine_path, engine_kwargs = get_setup_args(self.mode)
+        assert (os.path.exists(engine_path)), "build engine before calling"
 
-        print("downloading base model if necessary")
-        snapshot_download(
-            MODEL_ID,
-            local_dir=self.model_path,
-            ignore_patterns=["*.pt", "*.bin"],  # using safetensors
-            revision=MODEL_REVISION,
-        )
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
-
-        if self.mode == "fast":
-            engine_kwargs = {
-                "quant_config": get_quant_config(),
-                "calib_config": get_calib_config(),
-                "build_config": get_build_config(),
-                "speculative_config": get_speculative_config(),
-                "tensor_parallel_size": torch.cuda.device_count(),
-            }
-        else:
-            engine_kwargs = {
-                "tensor_parallel_size": torch.cuda.device_count(),
-            }
-
         self.sampling_params = SamplingParams(
             temperature=0.8,
             top_p=0.95,
@@ -382,13 +414,8 @@ class Model:
             lookahead_config=engine_kwargs.get("speculative_config"),
         )
 
-        engine_path = self.model_path / "trtllm_engine" / self.mode
-        if not os.path.exists(engine_path):
-            print(f"building new engine at {engine_path}")
-            self.llm = self.build_engine(engine_path, engine_kwargs)
-        else:
-            print(f"loading engine from {engine_path}")
-            self.llm = LLM(model=engine_path, **engine_kwargs)
+        print(f"loading engine from {engine_path}")
+        self.llm = LLM(model=engine_path, **engine_kwargs)
 
     @modal.method()
     def generate(self, prompt) -> dict:
@@ -529,11 +556,16 @@ def main(mode: str = "fast"):
 
 if __name__ == "__main__":
     import sys
+    mode = sys.argv[1] if len(sys.argv) > 1 else "fast"
 
     try:
+
+        print("🏎️  setting up model & trtllm engine")
+        modal.Function.from_name("trtllm-latency", "build_engine").remote(mode)
+
         Model = modal.Cls.from_name("trtllm-latency", "Model")
         print("🏎️  connecting to model")
-        model = Model(mode=sys.argv[1] if len(sys.argv) > 1 else "fast")
+        model = Model(mode=mode)
         model.boot.remote()
     except modal.exception.NotFoundError as e:
         raise SystemError("Deploy this app first with modal deploy") from e
