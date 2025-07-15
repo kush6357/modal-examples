@@ -18,7 +18,11 @@ def hello():
     cluster_info = modal.experimental.get_cluster_info()
     rank = cluster_info.rank
     if rank == 0:
-        with modal.forward(8265) as tunnel, modal.forward(8888) as jupyter_tunnel:
+        with (
+            modal.forward(8265) as tunnel,
+            modal.forward(8888) as jupyter_tunnel,
+            modal.forward(10001, unencrypted=True) as client_tunnel,
+        ):
             subprocess.run(
                 "ray start --head --disable-usage-stats --port=6379 --num-cpus=4 --dashboard-host=0.0.0.0",
                 shell=True,
@@ -27,6 +31,7 @@ def hello():
             token = secrets.token_urlsafe(13)
             url = jupyter_tunnel.url + "/?token=" + token
             print(f"Ray dashboard: {tunnel.url}")
+            print(f"Ray client: {client_tunnel}")
             print(f"Starting Jupyter at {url}")
             subprocess.run(
                 [
