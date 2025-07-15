@@ -25,7 +25,7 @@ def hello():
             )
 
             token = secrets.token_urlsafe(13)
-            url = jupyter_tunnel.url + "/?token=" + token + "lab/workspaces/auto-q/tree/ray_start.ipynb"
+            url = jupyter_tunnel.url + "/?token=" + token
             print(f"Ray dashboard: {tunnel.url}")
             print(f"Starting Jupyter at {url}")
             subprocess.run(
