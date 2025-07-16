@@ -18,7 +18,7 @@ vllm_image = (
     ).run_commands(
         "uv pip install --system -U 'vllm[audio]' --extra-index-url https://wheels.vllm.ai/nightly"
     )
-    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "HF_HOME": hf_cache_dir, "VLLM_CACHE_DIR": vllm_cache_dir, "VLLM_TORCH_COMPILE_LEVEL": "O1"}) 
+    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "HF_HOME": hf_cache_dir, "VLLM_CACHE_DIR": vllm_cache_dir, "VLLM_TORCH_COMPILE_LEVEL": "0"}) 
 )
 
 app = modal.App(name="send-message")
