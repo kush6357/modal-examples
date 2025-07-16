@@ -25,7 +25,7 @@ app = modal.App(name="send-message")
 HF_CACHE_VOLUME = modal.Volume.from_name("send-message-cache", create_if_missing=True)
 VLLM_CACHE_VOLUME = modal.Volume.from_name("send-message-vllm-cache", create_if_missing=True)
 
-@app.function(gpu="H100", image=vllm_image, timeout=60 * 10, volumes={hf_cache_dir: HF_CACHE_VOLUME, vllm_cache_dir: VLLM_CACHE_VOLUME})
+@app.function(gpu="H100", image=vllm_image, timeout=60 * 20, volumes={hf_cache_dir: HF_CACHE_VOLUME, vllm_cache_dir: VLLM_CACHE_VOLUME})
 def send_message():
     import subprocess
     import requests
@@ -205,7 +205,7 @@ def send_message():
         print(30 * "=" + "FINAL RESPONSE" + 30 * "=")
         print(final_response.choices[0].message.content)
     else:
-        print("No tool was called! The model didn't recognize the need to use the tool.")
+        print("No tool was called")
 
 @app.local_entrypoint()
 def main():
