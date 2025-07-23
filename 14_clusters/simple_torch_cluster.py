@@ -52,7 +52,7 @@ n_nodes = 4
 # Note that `N_GPU` is Modal configuration ("how many GPUs should we spin up for you?")
 # while `nproc_per_node` is `torch.distributed` configuration ("how many processes should we spawn for you?").
 
-n_proc_per_node = N_GPU = 1
+n_proc_per_node = N_GPU = 8
 GPU_CONFIG = f"H100:{N_GPU}"
 
 # Lastly, we need to select our communications library: the software that will handle
@@ -94,7 +94,7 @@ backend = "nccl"  # or "gloo" on CPU, see https://pytorch.org/docs/stable/distri
 
 
 @app.function(gpu=GPU_CONFIG)
-@modal.experimental.clustered(size=n_nodes)
+@modal.experimental.clustered(size=n_nodes, rdma=True)
 def dist_run_script(*args):
     from torch.distributed.run import parse_args, run
 
