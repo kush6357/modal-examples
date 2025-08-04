@@ -126,7 +126,7 @@ VLLM_PORT = 8000
 
 @app.function(
     image=vllm_image,
-    gpu=f"B200:{N_GPU}",
+    gpu=f"H100:{N_GPU}",
     scaledown_window=15 * MINUTES,  # how long should we stay up with no requests?
     timeout=10 * MINUTES,  # how long should we wait for container start?
     volumes={
@@ -163,6 +163,8 @@ def serve():
 
     # assume multiple GPUs are for splitting up large matrix multiplications
     cmd += ["--tensor-parallel-size", str(N_GPU)]
+
+    # cmd += ["--max-model-len", "8192"]  # max input length, in tokens
 
     print(cmd)
 

@@ -86,8 +86,8 @@ tensorrt_image = modal.Image.from_registry(
 tensorrt_image = tensorrt_image.apt_install(
     "openmpi-bin", "libopenmpi-dev", "git", "git-lfs", "wget"
 ).pip_install(
-    "tensorrt-llm==0.18.0",
-    "pynvml<12",  # avoid breaking change to pynvml version API
+    "tensorrt-llm==v1.0.0rc3",
+    "pynvml==12.0.0",  # avoid breaking change to pynvml version API
     "flashinfer-python==0.2.5",
     pre=True,
     extra_index_url="https://pypi.nvidia.com",
@@ -121,12 +121,13 @@ MODELS_PATH = VOLUME_PATH / "models"
 
 # MODEL_ID = "NousResearch/Meta-Llama-3-8B-Instruct"  # fork without repo gating
 # MODEL_ID = "Qwen/Qwen2.5-Coder-0.5B"  # fork without repo gating
-MODEL_ID = "Qwen/Qwen2.5-Coder-32B"  # fork without repo gating
+MODEL_ID = "Qwen/Qwen2.5-Coder-7B"  # fork without repo gating
+# MODEL_ID = "Qwen/Qwen2.5-Coder-32B"  # fork without repo gating
 # MODEL_REVISION = "53346005fb0ef11d3b6a83b12c895cca40156b6c"
 
 tensorrt_image = tensorrt_image.pip_install(
     "hf-transfer==0.1.9",
-    "huggingface_hub==0.28.1",
+    "huggingface_hub==0.33.4",
 ).env(
     {
         "HF_HUB_ENABLE_HF_TRANSFER": "1",
@@ -138,7 +139,8 @@ with tensorrt_image.imports():
     import os
 
     import torch
-    from tensorrt_llm import LLM, SamplingParams
+    from tensorrt_llm._tensorrt_engine import LLM
+    from tensorrt_llm import SamplingParams
 
 # ## Setting up the engine
 
@@ -175,7 +177,7 @@ with tensorrt_image.imports():
 # [See their code](https://github.com/NVIDIA/TensorRT-LLM/blob/88e1c90fd0484de061ecfbacfc78a4a8900a4ace/tensorrt_llm/models/modeling_utils.py#L184)
 # for more options.
 
-N_GPUS = 1  # Bumping this to 2 will improve latencies further but not 2x
+N_GPUS = 2  # Bumping this to 2 will improve latencies further but not 2x
 GPU_CONFIG = f"H100:{N_GPUS}"
 
 
@@ -247,7 +249,7 @@ def get_plugin_config():
             "multiple_profiles": True,
             "paged_kv_cache": True,
             "low_latency_gemm_swiglu_plugin": "fp8",
-            "low_latency_gemm_plugin": "fp8",
+            # "low_latency_gemm_plugin": "fp8",
         }
     )
 
@@ -343,7 +345,7 @@ def get_setup_args(mode):
     if mode == "fast":
         engine_kwargs = {
             "quant_config": get_quant_config(),
-            "calib_config": get_calib_config(),
+            # "calib_config": get_calib_config(),
             "build_config": get_build_config(),
             "speculative_config": get_speculative_config(),
             "tensor_parallel_size": torch.cuda.device_count(),
