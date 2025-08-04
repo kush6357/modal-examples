@@ -14,7 +14,7 @@
 # provide a URL for a `.wav` file to `modal run`:
 
 # ```bash
-# modal run 06_gpu_and_ml/parakeet/parakeet.py --audio-url="https://github.com/voxserv/audio_quality_testing_samples/raw/refs/heads/master/mono_44100/156550__acclivity__a-dream-within-a-dream.wav"
+# modal run 06_gpu_and_ml/speech-to-text/streaming_parakeet.py --audio-url="https://github.com/voxserv/audio_quality_testing_samples/raw/refs/heads/master/mono_44100/156550__acclivity__a-dream-within-a-dream.wav"
 # ```
 
 # You should see output like the following:
@@ -30,7 +30,7 @@
 # Just run
 
 # ```bash
-# modal serve 06_gpu_and_ml/parakeet/parakeet.py
+# modal serve 06_gpu_and_ml/speech-to-text/streaming_parakeet.py
 # ```
 
 # and go to the link printed in your terminal.
@@ -120,7 +120,7 @@ END_OF_STREAM = (
 )
 
 
-@app.cls(volumes={"/cache": model_cache}, gpu="a10g", image=image)
+@app.cls(volumes={"/cache": model_cache}, gpu="any", image=image)
 @modal.concurrent(max_inputs=14, target_inputs=10)
 class Parakeet:
     @modal.enter()

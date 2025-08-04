@@ -62,12 +62,12 @@ def main():
     # run the function remotely on Modal
     print(f.remote(1000))
 
-    # run the function in parallel and remotely on Modal
-    total = 0
-    for ret in f.map(range(200)):
-        total += ret
+    # # run the function in parallel and remotely on Modal
+    # total = 0
+    # for ret in f.map(range(200)):
+    #     total += ret
 
-    print(total)
+    # print(total)
 
 
 # Enter `modal run hello_world.py` in a shell, and you'll see a Modal app initialize.
