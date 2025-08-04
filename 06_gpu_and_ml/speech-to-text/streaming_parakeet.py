@@ -1,3 +1,6 @@
+# ---
+# cmd: ["modal", "run", "06_gpu_and_ml/speech-to-text/streaming_parakeet.py", "--audio-url='https://github.com/voxserv/audio_quality_testing_samples/raw/refs/heads/master/mono_44100/156550__acclivity__a-dream-within-a-dream.wav'"]
+# ---
 # # Streaming audio transcription using Parakeet
 
 # This examples demonstrates the use of Parakeet ASR models for streaming speech-to-text on Modal.
