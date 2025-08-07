@@ -46,9 +46,13 @@ import aiohttp
 import modal
 
 vllm_image = (
+    # modal.Image.debian_slim(python_version="3.12")
     modal.Image.from_registry(
         "nvidia/cuda:12.8.1-devel-ubuntu22.04",
         add_python="3.12",
+    )
+    .apt_install(
+        "git",
     )
     .uv_pip_install(
         "vllm==0.10.1+gptoss",
@@ -56,9 +60,21 @@ vllm_image = (
         pre=True,
         extra_options="--extra-index-url https://wheels.vllm.ai/gpt-oss/ --extra-index-url https://download.pytorch.org/whl/nightly/cu128 --index-strategy unsafe-best-match",
     )
+    .uv_pip_install(
+        "flashinfer-python==0.2.10",
+    )
+    # .run_commands(
+        # "git clone https://github.com/flashinfer-ai/flashinfer.git --recursive",
+        # "cd flashinfer && python -m pip install -v .",
+    # )
     .env(
         {
             "HF_HUB_ENABLE_HF_TRANSFER": "1",  # faster model transfers
+            "VLLM_USE_TRTLLM_ATTENTION": "1",
+            "VLLM_USE_TRTLLM_DECODE_ATTENTION": "1",
+            "VLLM_USE_TRTLLM_CONTEXT_ATTENTION": "1",
+            "VLLM_USE_FLASHINFER_MXFP4_MOE": "1",
+            "VLLM_USE_FLASHINFER_MXFP4_BF16_MOE": "1",
         }
     )
 )
@@ -96,7 +112,7 @@ FAST_BOOT = True
 
 @app.function(
     image=vllm_image,
-    gpu=f"H200:{N_GPU}",
+    gpu=f"B200:{N_GPU}",
     scaledown_window=15 * MINUTES,  # how long should we stay up with no requests?
     timeout=30 * MINUTES,  # how long should we wait for container start?
     volumes={
@@ -130,6 +146,10 @@ def serve():
     # enforce-eager disables both Torch compilation and CUDA graph capture
     # default is no-enforce-eager. see the --compilation-config flag for tighter control
     cmd += ["--enforce-eager" if FAST_BOOT else "--no-enforce-eager"]
+
+
+    # Higher perf, not compatible with structured output
+    cmd += ["--async-scheduling"]
 
     # assume multiple GPUs are for splitting up large matrix multiplications
     cmd += ["--tensor-parallel-size", str(N_GPU)]
