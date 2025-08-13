@@ -49,7 +49,7 @@ flux_image = (
         "ffmpeg",
         "libgl1",
     )
-    .pip_install(
+    .uv_pip_install(
         "invisible_watermark==0.2.0",
         "transformers==4.44.0",
         "huggingface_hub[hf_transfer]==0.26.2",
@@ -59,6 +59,7 @@ flux_image = (
         "torch==2.5.0",
         f"git+https://github.com/huggingface/diffusers.git@{diffusers_commit_sha}",
         "numpy<2",
+        "hf_transfer==0.1.9",
     )
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "HF_HUB_CACHE": "/cache"})
 )
@@ -78,7 +79,19 @@ flux_image = flux_image.env(
 # set its default image to the one we just constructed,
 # and import `FluxPipeline` for downloading and running Flux.1.
 
-app = modal.App("example-flux", image=flux_image)
+app = modal.App(
+    "example-flux",
+    image=flux_image,
+    volumes={  # add Volumes to store serializable compilation artifacts, see section on torch.compile below
+        "/cache": modal.Volume.from_name("hf-hub-cache", create_if_missing=True),
+        "/root/.nv": modal.Volume.from_name("nv-cache", create_if_missing=True),
+        "/root/.triton": modal.Volume.from_name("triton-cache", create_if_missing=True),
+        "/root/.inductor-cache": modal.Volume.from_name(
+            "inductor-cache", create_if_missing=True
+        ),
+    },
+    secrets=[modal.Secret.from_name("huggingface-secret")],
+)
 
 with flux_image.imports():
     import torch
@@ -110,24 +123,17 @@ NUM_INFERENCE_STEPS = 4  # use ~50 for [dev], smaller for [schnell]
 
 @app.cls(
     gpu="H100",  # fast GPU with strong software support
-    scaledown_window=20 * MINUTES,
+    scaledown_window=30,  # 20 * MINUTES,
     timeout=60 * MINUTES,  # leave plenty of time for compilation
-    volumes={  # add Volumes to store serializable compilation artifacts, see section on torch.compile below
-        "/cache": modal.Volume.from_name("hf-hub-cache", create_if_missing=True),
-        "/root/.nv": modal.Volume.from_name("nv-cache", create_if_missing=True),
-        "/root/.triton": modal.Volume.from_name("triton-cache", create_if_missing=True),
-        "/root/.inductor-cache": modal.Volume.from_name(
-            "inductor-cache", create_if_missing=True
-        ),
-    },
-    secrets=[modal.Secret.from_name("huggingface-secret")],
+    enable_memory_snapshot=True,
+    experimental_options={"enable_gpu_snapshot": True},
 )
 class Model:
     compile: bool = (  # see section on torch.compile below for details
         modal.parameter(default=False)
     )
 
-    @modal.enter()
+    @modal.enter(snap=True)
     def enter(self):
         pipe = FluxPipeline.from_pretrained(
             f"black-forest-labs/FLUX.1-{VARIANT}", torch_dtype=torch.bfloat16
@@ -150,9 +156,9 @@ class Model:
 
 # ## Calling our inference function
 
-# To generate an image we just need to call the `Model`'s `generate` method
+# To generate an image we just need to call the `Model`'s `inference` method
 # with `.remote` appended to it.
-# You can call `.generate.remote` from any Python environment that has access to your Modal credentials.
+# You can call `.inference.remote` from any Python environment that has access to your Modal credentials.
 # The local environment will get back the image as bytes.
 
 # Here, we wrap the call in a Modal [`local_entrypoint`](https://modal.com/docs/reference/modal.App#local_entrypoint)
@@ -162,7 +168,7 @@ class Model:
 # modal run flux.py
 # ```
 
-# By default, we call `generate` twice to demonstrate how much faster
+# By default, we call `inference` twice to demonstrate how much faster
 # the inference is after cold start. In our tests, clients received images in about 1.2 seconds.
 # We save the output bytes to a temporary file.
 
