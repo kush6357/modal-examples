@@ -104,7 +104,7 @@ with flux_image.imports():
 # with the name `huggingface-secret` following the instructions in the template.*
 
 MINUTES = 60  # seconds
-VARIANT = "schnell"  # or "dev"
+VARIANT = "dev"  # "schnell" or "dev"
 NUM_INFERENCE_STEPS = 4  # use ~50 for [dev], smaller for [schnell]
 
 
